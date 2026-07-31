@@ -58,6 +58,17 @@ swift test
 ./scripts/package_app.sh
 ```
 
+## 发布
+
+推送一个与 `Info.plist` 中应用版本一致的 `v*` 标签，GitHub Actions 会自动测试、打包、校验签名，并把版本化的 `.zip` 和 SHA-256 校验文件发布到 GitHub Releases：
+
+```bash
+git tag v0.12.0
+git push origin v0.12.0
+```
+
+如果标签已经存在，也可以在 GitHub 的 Actions 页面手动运行 `Build and Release`，输入对应标签重新构建或更新 Release 附件。普通分支 push 不会创建 Release。
+
 ## 已知边界
 
 - 完整原生详情目前只覆盖普通词条；文法、例句和真题先显示搜索摘要。

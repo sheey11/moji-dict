@@ -1,0 +1,92 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release, for example v0.12.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build macOS app
+    runs-on: macos-26
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      ARCHIVE_PATH: releases/Moji 辞書.zip
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          app_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
+          expected_tag="v${app_version}"
+
+          if [[ "$RELEASE_TAG" != "$expected_tag" ]]; then
+            echo "::error::Release tag '$RELEASE_TAG' does not match the app version '$expected_tag'."
+            exit 1
+          fi
+
+          if ! git rev-parse --verify "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error::Tag '$RELEASE_TAG' does not exist in the repository."
+            exit 1
+          fi
+
+      - name: Show build tools
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Run tests
+        run: swift test --disable-sandbox
+
+      - name: Package app
+        run: ./scripts/package_app.sh releases
+
+      - name: Verify and name release assets
+        shell: bash
+        run: |
+          codesign --verify --deep --strict --verbose=2 "releases/Moji 辞書.app"
+          unzip -t "$ARCHIVE_PATH"
+
+          asset_path="releases/Moji-Dictionary-${RELEASE_TAG}.zip"
+          cp "$ARCHIVE_PATH" "$asset_path"
+          shasum -a 256 "$asset_path" > "${asset_path}.sha256"
+
+          echo "ASSET_PATH=$asset_path" >> "$GITHUB_ENV"
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "$ASSET_PATH" \
+              "${ASSET_PATH}.sha256" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "$ASSET_PATH" \
+              "${ASSET_PATH}.sha256" \
+              --verify-tag \
+              --title "Moji 辞書 $RELEASE_TAG" \
+              --generate-notes
+          fi
