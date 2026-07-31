@@ -48,6 +48,52 @@ final class MojiQuickLookTests: XCTestCase {
         XCTAssertTrue(response.unassignedExampleGroups.isEmpty)
     }
 
+    func testWordDetailIgnoresNullExampleTranslation() throws {
+        let data = Data(
+            """
+            {
+              "word": {
+                "id":"kana-word",
+                "spell":"ほろ",
+                "pron":"ほろ",
+                "excerpt":"[副词] すこし"
+              },
+              "subdetails": [
+                {
+                  "id":"s1",
+                  "relaId":"s1",
+                  "title":"すこし、なんとなくなどの意を表す。",
+                  "lang":"ja"
+                }
+              ],
+              "examples": [
+                {
+                  "id":"e1",
+                  "relaId":"pair1",
+                  "subdetailsId":"s1",
+                  "title":"ほろ酔い",
+                  "lang":"ja"
+                },
+                {
+                  "id":"e2",
+                  "relaId":"pair1",
+                  "subdetailsId":"s1",
+                  "title":null,
+                  "lang":"zh-CN"
+                }
+              ]
+            }
+            """.utf8
+        )
+
+        let response = try JSONDecoder().decode(WordDetailResponse.self, from: data)
+        let examples = try XCTUnwrap(response.definitionGroups.first?.examples)
+
+        XCTAssertEqual(examples.count, 1)
+        XCTAssertEqual(examples.first?.japanese, "ほろ酔い")
+        XCTAssertNil(examples.first?.chinese)
+    }
+
     func testRubySegmentationAnnotatesOnlyKanjiRuns() {
         XCTAssertEqual(
             RubySegmenter.segments(base: "踏む", reading: "ふむ"),
@@ -283,5 +329,13 @@ final class MojiQuickLookTests: XCTestCase {
 
         let related = try await client.wordRelated(id: firstWord.targetId)
         XCTAssertTrue(related?.hasContent ?? false)
+
+        for query in ["ほろ", "全く"] {
+            let response = try await client.search(query)
+            let secondWord = try XCTUnwrap(response.word?.list?.dropFirst().first)
+            let detail = try await client.wordDetail(id: secondWord.targetId)
+            XCTAssertFalse(detail.word?.spell?.isEmpty ?? true)
+            XCTAssertFalse(detail.definitionGroups.isEmpty)
+        }
     }
 }

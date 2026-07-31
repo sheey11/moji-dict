@@ -246,19 +246,31 @@ struct WordDetailResponse: Decodable, Sendable {
         _ items: [WordExample],
         order: [String: Int]
     ) -> [ExampleGroup] {
-        let japanese = items.filter { $0.lang == "ja" }
-        let chinese = items.filter { $0.lang == "zh-CN" }
+        let japanese = items.filter {
+            $0.lang == "ja" && $0.displayTitle != nil
+        }
+        let chinese = items.filter {
+            $0.lang == "zh-CN" && $0.displayTitle != nil
+        }
 
         var groups = japanese.map { item in
             ExampleGroup(
                 id: item.relaId,
-                japanese: item.title,
-                chinese: chinese.first(where: { $0.relaId == item.relaId })?.title
+                japanese: item.displayTitle,
+                chinese: chinese.first(where: {
+                    $0.relaId == item.relaId
+                })?.displayTitle
             )
         }
 
         for item in chinese where !groups.contains(where: { $0.id == item.relaId }) {
-            groups.append(ExampleGroup(id: item.relaId, japanese: nil, chinese: item.title))
+            groups.append(
+                ExampleGroup(
+                    id: item.relaId,
+                    japanese: nil,
+                    chinese: item.displayTitle
+                )
+            )
         }
         return groups.sorted {
             (order[$0.id] ?? Int.max) < (order[$1.id] ?? Int.max)
@@ -326,8 +338,18 @@ struct WordExample: Decodable, Sendable {
     let id: String
     let relaId: String
     let subdetailsId: String?
-    let title: String
+    let title: String?
     let lang: String
+
+    var displayTitle: String? {
+        guard
+            let title,
+            !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+        return title
+    }
 }
 
 struct DefinitionGroup: Identifiable, Hashable, Sendable {
