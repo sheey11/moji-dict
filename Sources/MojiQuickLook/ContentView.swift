@@ -259,13 +259,17 @@ private struct WordDetailView: View {
             }
 
             if !detail.definitionGroups.isEmpty {
-                DefinitionSection(groups: detail.definitionGroups)
+                DefinitionSection(
+                    groups: detail.definitionGroups,
+                    selectWord: selectRelated
+                )
             }
 
             if !detail.unassignedExampleGroups.isEmpty {
                 ExampleSection(
                     title: "其他例句",
-                    groups: detail.unassignedExampleGroups
+                    groups: detail.unassignedExampleGroups,
+                    selectWord: selectRelated
                 )
             }
 
@@ -281,6 +285,7 @@ private struct WordDetailView: View {
 
 private struct DefinitionSection: View {
     let groups: [DefinitionGroup]
+    let selectWord: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -309,19 +314,21 @@ private struct DefinitionSection: View {
                                 .textSelection(.enabled)
                         }
                         if let japanese = group.japanese, !japanese.isEmpty {
-                            DictionaryRichText(
+                            JapaneseLookupText(
                                 japanese,
                                 pointSize: 14,
-                                color: .secondary
+                                color: .secondary,
+                                selectWord: selectWord
                             )
-                                .lineSpacing(2)
-                                .textSelection(.enabled)
                         }
 
                         if !group.examples.isEmpty {
                             VStack(alignment: .leading, spacing: 0) {
                                 ForEach(group.examples) { example in
-                                    ExamplePairView(group: example)
+                                    ExamplePairView(
+                                        group: example,
+                                        selectWord: selectWord
+                                    )
                                 }
                             }
                         }
@@ -335,6 +342,7 @@ private struct DefinitionSection: View {
 private struct ExampleSection: View {
     let title: String
     let groups: [ExampleGroup]
+    let selectWord: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -342,7 +350,10 @@ private struct ExampleSection: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(groups) { group in
-                    ExamplePairView(group: group)
+                    ExamplePairView(
+                        group: group,
+                        selectWord: selectWord
+                    )
                 }
             }
         }
@@ -351,6 +362,7 @@ private struct ExampleSection: View {
 
 private struct ExamplePairView: View {
     let group: ExampleGroup
+    let selectWord: (String) -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
@@ -361,13 +373,12 @@ private struct ExamplePairView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 if let japanese = group.japanese, !japanese.isEmpty {
-                    DictionaryRichText(
+                    JapaneseLookupText(
                         japanese,
                         pointSize: 14,
-                        color: .secondary
+                        color: .secondary,
+                        selectWord: selectWord
                     )
-                        .lineSpacing(2)
-                        .textSelection(.enabled)
                 }
                 if let chinese = group.chinese, !chinese.isEmpty {
                     DictionaryRichText(chinese, pointSize: 14)

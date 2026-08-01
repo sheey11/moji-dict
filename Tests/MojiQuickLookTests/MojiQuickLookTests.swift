@@ -3,6 +3,19 @@ import XCTest
 @testable import MojiQuickLook
 
 final class MojiQuickLookTests: XCTestCase {
+    func testJapaneseWordTokenizerPreservesTextAndMarksWords() {
+        let source = "「外国の地を踏む。」"
+        let runs = JapaneseWordTokenizer.runs(in: source)
+
+        XCTAssertEqual(runs.map(\.value).joined(), source)
+        XCTAssertEqual(
+            runs.filter(\.isLookup).map(\.value),
+            ["外国", "の", "地", "を", "踏む"]
+        )
+        XCTAssertFalse(runs.first?.isLookup ?? true)
+        XCTAssertFalse(runs.last?.isLookup ?? true)
+    }
+
     func testSearchResponseFlattensSectionsInDisplayOrder() throws {
         let data = Data(
             """
