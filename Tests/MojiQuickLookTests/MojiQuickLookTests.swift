@@ -17,6 +17,23 @@ final class MojiQuickLookTests: XCTestCase {
         )
     }
 
+    func testForvoLookupPrefersCanonicalDetailSpelling() {
+        XCTAssertEqual(
+            ForvoLookupTerm.preferred(
+                detailSpell: "脇",
+                fallback: "わき"
+            ),
+            "脇"
+        )
+        XCTAssertEqual(
+            ForvoLookupTerm.preferred(
+                detailSpell: nil,
+                fallback: " 踏む "
+            ),
+            "踏む"
+        )
+    }
+
     func testForvoPageParserExtractsJapanesePronunciations() throws {
         let html =
             """
@@ -418,7 +435,8 @@ final class MojiQuickLookTests: XCTestCase {
             throw XCTSkip("Set MOJI_LIVE_TESTS=1 to run the read-only live endpoint test.")
         }
 
-        let result = try await ForvoClient().pronunciations(for: "踏む")
+        let client = ForvoClient()
+        let result = try await client.pronunciations(for: "踏む")
         let first = try XCTUnwrap(result.pronunciations.first)
 
         XCTAssertTrue(first.audioURL.host()?.hasSuffix(".forvo.com") ?? false)
@@ -437,5 +455,67 @@ final class MojiQuickLookTests: XCTestCase {
                 .hasPrefix("audio/") ?? false
         )
         XCTAssertGreaterThan(audioData.count, 1_000)
+
+        _ = try? await client.pronunciations(for: "わき")
+        let waki = try await client.pronunciations(for: "脇")
+        XCTAssertFalse(waki.pronunciations.isEmpty)
+        XCTAssertTrue(
+            waki.pronunciations.contains {
+                $0.localeDescription == "日本・女性"
+            }
+        )
+    }
+
+    func testLiveWakiViewModelWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["MOJI_LIVE_TESTS"] == "1" else {
+            throw XCTSkip("Set MOJI_LIVE_TESTS=1 to run the read-only live endpoint test.")
+        }
+
+        let model = await SearchViewModel()
+        await MainActor.run {
+            model.query = "脇"
+            model.searchImmediately()
+        }
+
+        for _ in 0..<40 {
+            let isFinished = await MainActor.run {
+                model.forvoAudio != nil || model.searchError != nil
+            }
+            if isFinished { break }
+            try await Task.sleep(for: .milliseconds(200))
+        }
+
+        let initialCount = await MainActor.run {
+            model.forvoAudio?.pronunciations.count ?? 0
+        }
+        XCTAssertGreaterThan(initialCount, 0)
+
+        await MainActor.run {
+            model.query = "わき"
+            model.searchImmediately()
+        }
+
+        for _ in 0..<40 {
+            let isFinished = await MainActor.run {
+                model.forvoAudio != nil || model.searchError != nil
+            }
+            if isFinished { break }
+            try await Task.sleep(for: .milliseconds(200))
+        }
+
+        let snapshot = await MainActor.run {
+            (
+                resultHeadword: model.selectedResult?.headword,
+                detailSpell: model.detail?.word?.spell,
+                pronunciationCount: model.forvoAudio?.pronunciations.count,
+                searchError: model.searchError,
+                detailError: model.detailError
+            )
+        }
+        XCTAssertEqual(snapshot.resultHeadword, "わき")
+        XCTAssertEqual(snapshot.detailSpell, "脇")
+        XCTAssertNil(snapshot.searchError)
+        XCTAssertNil(snapshot.detailError)
+        XCTAssertGreaterThan(snapshot.pronunciationCount ?? 0, 0)
     }
 }

@@ -210,7 +210,11 @@ final class SearchViewModel: ObservableObject {
                 let preferred = visibleResults.first(where: { $0.category == .word })
                     ?? visibleResults.first
                     ?? results.first
-                selectedID = preferred?.id
+                if let preferred, selectedID == preferred.id {
+                    loadSelectedDetail()
+                } else {
+                    selectedID = preferred?.id
+                }
                 recordCurrentPage()
             } catch is CancellationError {
                 return
@@ -259,10 +263,11 @@ final class SearchViewModel: ObservableObject {
 
     private func requestForvo(
         for result: SearchResult,
+        word requestedWord: String? = nil,
         forceRefresh: Bool = false
     ) {
         forvoTask?.cancel()
-        let word = result.headword
+        let word = requestedWord ?? result.headword
 
         forvoTask = Task { [weak self] in
             guard let self else { return }
@@ -306,6 +311,17 @@ final class SearchViewModel: ObservableObject {
                 detail = response
                 related = relatedResponse
                 isLoadingDetail = false
+
+                let canonicalWord = ForvoLookupTerm.preferred(
+                    detailSpell: response.word?.spell,
+                    fallback: result.headword
+                )
+                let initialWord = result.headword.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                if canonicalWord != initialWord {
+                    requestForvo(for: result, word: canonicalWord)
+                }
             } catch is CancellationError {
                 return
             } catch {
@@ -360,7 +376,11 @@ final class SearchViewModel: ObservableObject {
         let destination = results.first(where: { $0.id == page.selectedID })
             ?? visibleResults.first
             ?? results.first
-        selectedID = destination?.id
+        if let destination, selectedID == destination.id {
+            loadSelectedDetail()
+        } else {
+            selectedID = destination?.id
+        }
         isNavigatingHistory = false
     }
 

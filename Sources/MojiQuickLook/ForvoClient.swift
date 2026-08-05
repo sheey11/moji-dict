@@ -39,6 +39,20 @@ enum ForvoURL {
     }
 }
 
+enum ForvoLookupTerm {
+    static func preferred(
+        detailSpell: String?,
+        fallback: String
+    ) -> String {
+        let detailSpell = detailSpell?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let detailSpell, !detailSpell.isEmpty {
+            return detailSpell
+        }
+        return fallback.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 struct ForvoPronunciation: Identifiable, Hashable, Sendable {
     let id: String
     let audioURL: URL
