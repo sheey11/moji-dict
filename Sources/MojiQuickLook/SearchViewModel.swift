@@ -79,6 +79,7 @@ final class SearchViewModel: ObservableObject {
     @Published private(set) var results: [SearchResult] = []
     @Published private(set) var detail: WordDetailResponse?
     @Published private(set) var related: WordRelatedGroup?
+    @Published private(set) var forvoAudio: ForvoWordAudio?
     @Published private(set) var isSearching = false
     @Published private(set) var isLoadingDetail = false
     @Published private(set) var searchError: String?
@@ -87,19 +88,26 @@ final class SearchViewModel: ObservableObject {
     @Published private(set) var navigationHistory = LookupHistory()
 
     private let api: MojiAPIClient
+    private let forvoClient: ForvoClient
     private var searchTask: Task<Void, Never>?
     private var detailTask: Task<Void, Never>?
+    private var forvoTask: Task<Void, Never>?
     private var pendingHistoryPage: LookupPage?
     private var isNavigatingHistory = false
     private var isApplyingHistoryPage = false
 
-    init(api: MojiAPIClient = .shared) {
+    init(
+        api: MojiAPIClient = .shared,
+        forvoClient: ForvoClient = .shared
+    ) {
         self.api = api
+        self.forvoClient = forvoClient
     }
 
     deinit {
         searchTask?.cancel()
         detailTask?.cancel()
+        forvoTask?.cancel()
     }
 
     var visibleResults: [SearchResult] {
@@ -136,6 +144,7 @@ final class SearchViewModel: ObservableObject {
     func retryDetail() {
         guard let selectedResult, selectedResult.category == .word else { return }
         requestDetail(for: selectedResult, forceRefresh: true)
+        requestForvo(for: selectedResult, forceRefresh: true)
     }
 
     func clear() {
@@ -144,6 +153,7 @@ final class SearchViewModel: ObservableObject {
         selectedID = nil
         detail = nil
         related = nil
+        forvoAudio = nil
         searchError = nil
         detailError = nil
         lastLatencyMilliseconds = nil
@@ -154,6 +164,8 @@ final class SearchViewModel: ObservableObject {
     private func scheduleSearch(delay: Duration? = .milliseconds(180)) {
         searchTask?.cancel()
         detailTask?.cancel()
+        forvoTask?.cancel()
+        forvoAudio = nil
 
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
@@ -161,6 +173,7 @@ final class SearchViewModel: ObservableObject {
             selectedID = nil
             detail = nil
             related = nil
+            forvoAudio = nil
             searchError = nil
             detailError = nil
             isSearching = false
@@ -207,6 +220,7 @@ final class SearchViewModel: ObservableObject {
                 selectedID = nil
                 detail = nil
                 related = nil
+                forvoAudio = nil
                 isSearching = false
                 searchError = error.localizedDescription
                 pendingHistoryPage = nil
@@ -224,8 +238,10 @@ final class SearchViewModel: ObservableObject {
 
     private func loadSelectedDetail() {
         detailTask?.cancel()
+        forvoTask?.cancel()
         detail = nil
         related = nil
+        forvoAudio = nil
         detailError = nil
         recordCurrentPage()
 
@@ -238,6 +254,33 @@ final class SearchViewModel: ObservableObject {
             return
         }
         requestDetail(for: selectedResult)
+        requestForvo(for: selectedResult)
+    }
+
+    private func requestForvo(
+        for result: SearchResult,
+        forceRefresh: Bool = false
+    ) {
+        forvoTask?.cancel()
+        let word = result.headword
+
+        forvoTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let response = try await forvoClient.pronunciations(
+                    for: word,
+                    forceRefresh: forceRefresh
+                )
+                try Task.checkCancellation()
+                guard selectedID == result.id else { return }
+                forvoAudio = response
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled, selectedID == result.id else { return }
+                forvoAudio = nil
+            }
+        }
     }
 
     private func requestDetail(for result: SearchResult, forceRefresh: Bool = false) {

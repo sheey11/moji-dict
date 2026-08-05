@@ -3,6 +3,67 @@ import XCTest
 @testable import MojiQuickLook
 
 final class MojiQuickLookTests: XCTestCase {
+    func testForvoURLPercentEncodesJapaneseTerm() throws {
+        let pageURL = try XCTUnwrap(ForvoURL.wordPage(for: " 踏む "))
+        let requestURL = try XCTUnwrap(ForvoURL.wordRequest(for: " 踏む "))
+
+        XCTAssertEqual(
+            pageURL.absoluteString,
+            "https://forvo.com/word/%E8%B8%8F%E3%82%80/#ja"
+        )
+        XCTAssertEqual(
+            requestURL.absoluteString,
+            "https://forvo.com/word/%E8%B8%8F%E3%82%80/"
+        )
+    }
+
+    func testForvoPageParserExtractsJapanesePronunciations() throws {
+        let html =
+            """
+            <script>
+            var _AUDIO_HTTP_HOST='audio12.forvo.com';
+            </script>
+            <li class="pronunciation li-active">
+              <div class="play" id="play_1705105"
+                   onclick="Play(1705105,'OTA2MTQyOC83Ni85MDYxNDI4Xzc2XzE5MzUzMTZfMS5tcDM=','',false,'YS9mL2FmXzkwNjE0MjhfNzZfMTkzNTMxNl8xLm1wMw==','','h','踏む','Japanese');return false;">
+              </div>
+              <span class="info">Pronunciation by
+                <span data-p2="akitomo">akitomo</span>
+              </span>
+              <span class="responsive-gender-country">Male from Japan</span>
+            </li>
+            <li class="pronunciation li-active">
+              <div class="play" id="play_5303168"
+                   onclick="Play(5303168,'OTY5Mjc1MS83Ni85NjkyNzUxXzc2XzE5MzUzMTYubXAz','',false,'','','l','踏む','Japanese');return false;">
+              </div>
+              <span class="info">Pronunciation by
+                <span data-p2="straycat88">straycat88</span>
+              </span>
+              <span class="responsive-gender-country">Female from Japan</span>
+            </li>
+            """
+        let pageURL = try XCTUnwrap(ForvoURL.wordPage(for: "踏む"))
+        let result = ForvoPageParser.parse(
+            word: "踏む",
+            pageURL: pageURL,
+            html: html
+        )
+
+        XCTAssertEqual(result.pronunciations.count, 2)
+        XCTAssertEqual(result.pronunciations[0].speaker, "akitomo")
+        XCTAssertEqual(result.pronunciations[0].localeDescription, "日本・男性")
+        XCTAssertEqual(
+            result.pronunciations[0].audioURL.absoluteString,
+            "https://audio12.forvo.com/audios/mp3/a/f/af_9061428_76_1935316_1.mp3"
+        )
+        XCTAssertEqual(result.pronunciations[1].speaker, "straycat88")
+        XCTAssertEqual(result.pronunciations[1].localeDescription, "日本・女性")
+        XCTAssertEqual(
+            result.pronunciations[1].audioURL.absoluteString,
+            "https://audio12.forvo.com/mp3/9692751/76/9692751_76_1935316.mp3"
+        )
+    }
+
     func testJapaneseWordTokenizerPreservesTextAndMarksWords() {
         let source = "「外国の地を踏む。」"
         let runs = JapaneseWordTokenizer.runs(in: source)
@@ -350,5 +411,31 @@ final class MojiQuickLookTests: XCTestCase {
             XCTAssertFalse(detail.word?.spell?.isEmpty ?? true)
             XCTAssertFalse(detail.definitionGroups.isEmpty)
         }
+    }
+
+    func testLiveForvoWhenEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["MOJI_LIVE_TESTS"] == "1" else {
+            throw XCTSkip("Set MOJI_LIVE_TESTS=1 to run the read-only live endpoint test.")
+        }
+
+        let result = try await ForvoClient().pronunciations(for: "踏む")
+        let first = try XCTUnwrap(result.pronunciations.first)
+
+        XCTAssertTrue(first.audioURL.host()?.hasSuffix(".forvo.com") ?? false)
+        XCTAssertEqual(first.audioURL.pathExtension, "mp3")
+        XCTAssertFalse(first.speaker?.isEmpty ?? true)
+        XCTAssertFalse(first.profile?.isEmpty ?? true)
+        XCTAssertFalse(first.localeDescription.isEmpty)
+
+        let (audioData, response) = try await URLSession.shared.data(
+            from: first.audioURL
+        )
+        let httpResponse = try XCTUnwrap(response as? HTTPURLResponse)
+        XCTAssertEqual(httpResponse.statusCode, 200)
+        XCTAssertTrue(
+            httpResponse.value(forHTTPHeaderField: "Content-Type")?
+                .hasPrefix("audio/") ?? false
+        )
+        XCTAssertGreaterThan(audioData.count, 1_000)
     }
 }

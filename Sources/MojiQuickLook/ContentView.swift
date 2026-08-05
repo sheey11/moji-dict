@@ -110,7 +110,8 @@ struct ContentView: View {
                         if let detail = model.detail {
                             WordDetailView(
                                 detail: detail,
-                                related: model.related
+                                related: model.related,
+                                forvoAudio: model.forvoAudio
                             ) { spell in
                                 model.filter = .word
                                 model.query = spell
@@ -241,20 +242,23 @@ private struct HeadwordText: View {
 private struct WordDetailView: View {
     let detail: WordDetailResponse
     let related: WordRelatedGroup?
+    let forvoAudio: ForvoWordAudio?
     let selectRelated: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            if
-                let excerpt = detail.word?.excerpt,
-                !excerpt.isEmpty
-            {
-                let metadata = DictionaryTypography.metadataSummary(in: excerpt)
-                if !metadata.isEmpty {
-                    Text(metadata)
-                        .font(.system(size: 14, design: .default))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+            if !metadata.isEmpty || forvoAudio?.defaultPronunciation != nil {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    if !metadata.isEmpty {
+                        Text(metadata)
+                            .font(.system(size: 14, design: .default))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+
+                    if let pronunciation = forvoAudio?.defaultPronunciation {
+                        ForvoPlayButton(pronunciation: pronunciation)
+                    }
                 }
             }
 
@@ -279,7 +283,19 @@ private struct WordDetailView: View {
                     selectRelated: selectRelated
                 )
             }
+
+            if let pronunciations = forvoAudio?.pronunciations,
+               !pronunciations.isEmpty {
+                ForvoPronunciationsSection(pronunciations: pronunciations)
+            }
         }
+    }
+
+    private var metadata: String {
+        guard let excerpt = detail.word?.excerpt, !excerpt.isEmpty else {
+            return ""
+        }
+        return DictionaryTypography.metadataSummary(in: excerpt)
     }
 }
 
@@ -497,6 +513,49 @@ private struct RelatedButton: View {
     }
 }
 
+private struct ForvoPronunciationsSection: View {
+    let pronunciations: [ForvoPronunciation]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(pronunciations) { pronunciation in
+                HStack(spacing: 7) {
+                    ForvoPlayButton(pronunciation: pronunciation)
+                    Text(pronunciation.localeDescription)
+                        .font(.system(size: 12, design: .default))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+private struct ForvoPlayButton: View {
+    let pronunciation: ForvoPronunciation
+
+    var body: some View {
+        Button {
+            ForvoAudioPlayer.shared.play(pronunciation)
+        } label: {
+            Image(systemName: "speaker.wave.2")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(2)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(helpText)
+        .accessibilityLabel(helpText)
+    }
+
+    private var helpText: String {
+        if let speaker = pronunciation.speaker, !speaker.isEmpty {
+            return "播放 \(speaker) 在 Forvo 上传的发音"
+        }
+        return "播放 Forvo 发音"
+    }
+}
+
 private struct DictionarySectionHeader: View {
     let title: String
 
@@ -568,6 +627,14 @@ private struct ExternalLookupButtons: View {
             .buttonStyle(.bordered)
             .help("在系统“词典”App 中查询“\(headword)”")
         }
+
+        if let url = ForvoURL.wordPage(for: headword) {
+            Link(destination: url) {
+                Label("Forvo 单词页面", systemImage: "speaker.wave.2")
+            }
+            .buttonStyle(.bordered)
+            .help("在浏览器中打开“\(headword)”的 Forvo 发音页面")
+        }
     }
 }
 
@@ -590,7 +657,7 @@ private struct SourceNotice: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Divider()
-            Text("MOJi 在线词典 · 个人只读客户端 · 与 MOJi 官方无隶属关系")
+            Text("MOJi 在线词典 · 发音来自 Forvo 用户 · 个人只读客户端 · 与双方官方无隶属关系")
         }
         .font(.caption2)
         .foregroundStyle(.tertiary)
