@@ -146,9 +146,8 @@ struct ContentView: View {
                 .padding(.horizontal, 52)
                 .padding(.vertical, 38)
             }
-            .background(Color(nsColor: .textBackgroundColor))
         } else {
-            Color(nsColor: .textBackgroundColor)
+            Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

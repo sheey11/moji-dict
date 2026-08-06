@@ -4,7 +4,7 @@ import SwiftUI
 struct MojiQuickLookApp: App {
     var body: some Scene {
         WindowGroup("Moji 辞書") {
-            ContentView()
+            AppWindowContent()
         }
         .defaultSize(width: 1_050, height: 700)
         .windowStyle(.titleBar)
@@ -13,6 +13,42 @@ struct MojiQuickLookApp: App {
         Settings {
             SettingsView()
         }
+    }
+}
+
+private struct AppWindowContent: View {
+    var body: some View {
+        if #available(macOS 15.0, *) {
+            ContentView()
+                .containerBackground(
+                    Color(nsColor: .textBackgroundColor),
+                    for: .window
+                )
+        } else {
+            ContentView()
+                .background(LegacyWindowBackgroundSetter())
+        }
+    }
+}
+
+private struct LegacyWindowBackgroundSetter: NSViewRepresentable {
+    func makeNSView(context: Context) -> WindowBackgroundView {
+        WindowBackgroundView()
+    }
+
+    func updateNSView(_ nsView: WindowBackgroundView, context: Context) {
+        nsView.applyWindowBackground()
+    }
+}
+
+private final class WindowBackgroundView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        applyWindowBackground()
+    }
+
+    func applyWindowBackground() {
+        window?.backgroundColor = .textBackgroundColor
     }
 }
 
