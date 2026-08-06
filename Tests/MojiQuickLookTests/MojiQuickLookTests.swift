@@ -68,12 +68,16 @@ final class MojiQuickLookTests: XCTestCase {
 
         XCTAssertEqual(result.pronunciations.count, 2)
         XCTAssertEqual(result.pronunciations[0].speaker, "akitomo")
+        XCTAssertEqual(result.pronunciations[0].speakerHandle, "@akitomo")
+        XCTAssertEqual(result.pronunciations[0].speakerAttribution, "　@akitomo")
         XCTAssertEqual(result.pronunciations[0].localeDescription, "日本・男性")
         XCTAssertEqual(
             result.pronunciations[0].audioURL.absoluteString,
             "https://audio12.forvo.com/audios/mp3/a/f/af_9061428_76_1935316_1.mp3"
         )
         XCTAssertEqual(result.pronunciations[1].speaker, "straycat88")
+        XCTAssertEqual(result.pronunciations[1].speakerHandle, "@straycat88")
+        XCTAssertEqual(result.pronunciations[1].speakerAttribution, "　@straycat88")
         XCTAssertEqual(result.pronunciations[1].localeDescription, "日本・女性")
         XCTAssertEqual(
             result.pronunciations[1].audioURL.absoluteString,

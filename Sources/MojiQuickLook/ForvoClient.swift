@@ -59,6 +59,22 @@ struct ForvoPronunciation: Identifiable, Hashable, Sendable {
     let speaker: String?
     let profile: String?
 
+    var speakerHandle: String? {
+        guard
+            let speaker = speaker?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ),
+            !speaker.isEmpty
+        else {
+            return nil
+        }
+        return speaker.hasPrefix("@") ? speaker : "@\(speaker)"
+    }
+
+    var speakerAttribution: String? {
+        speakerHandle.map { "　\($0)" }
+    }
+
     var localeDescription: String {
         guard let profile, !profile.isEmpty else {
             return speaker ?? "Forvo"

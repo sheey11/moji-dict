@@ -521,9 +521,15 @@ private struct ForvoPronunciationsSection: View {
             ForEach(pronunciations) { pronunciation in
                 HStack(spacing: 7) {
                     ForvoPlayButton(pronunciation: pronunciation)
-                    Text(pronunciation.localeDescription)
-                        .font(.system(size: 12, design: .default))
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 0) {
+                        Text(pronunciation.localeDescription)
+                            .foregroundStyle(.secondary)
+                        if let speakerAttribution = pronunciation.speakerAttribution {
+                            Text(speakerAttribution)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .font(.system(size: 12, design: .default))
                 }
             }
         }
