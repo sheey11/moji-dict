@@ -58,6 +58,15 @@ final class MojiQuickLookTests: XCTestCase {
               </span>
               <span class="responsive-gender-country">Female from Japan</span>
             </li>
+            <li class="pronunciation li-active">
+              <div class="play" id="play_6234028"
+                   onclick="Play(6234028,'OTY5Mjc1MS83Ni85NjkyNzUxXzc2XzE5MzUzMTYubXAz','',false,'','','l','踏む','Japanese');return false;">
+              </div>
+              <span class="info">Pronunciation by
+                <span class="inactive">monekuson</span>
+              </span>
+              <span class="responsive-gender-country">Male from Japan</span>
+            </li>
             """
         let pageURL = try XCTUnwrap(ForvoURL.wordPage(for: "踏む"))
         let result = ForvoPageParser.parse(
@@ -66,7 +75,7 @@ final class MojiQuickLookTests: XCTestCase {
             html: html
         )
 
-        XCTAssertEqual(result.pronunciations.count, 2)
+        XCTAssertEqual(result.pronunciations.count, 3)
         XCTAssertEqual(result.pronunciations[0].speaker, "akitomo")
         XCTAssertEqual(result.pronunciations[0].speakerHandle, "@akitomo")
         XCTAssertEqual(result.pronunciations[0].speakerAttribution, "　@akitomo")
@@ -83,6 +92,10 @@ final class MojiQuickLookTests: XCTestCase {
             result.pronunciations[1].audioURL.absoluteString,
             "https://audio12.forvo.com/mp3/9692751/76/9692751_76_1935316.mp3"
         )
+        XCTAssertEqual(result.pronunciations[2].speaker, "monekuson")
+        XCTAssertEqual(result.pronunciations[2].speakerHandle, "@monekuson")
+        XCTAssertEqual(result.pronunciations[2].speakerAttribution, "　@monekuson")
+        XCTAssertEqual(result.pronunciations[2].localeDescription, "日本・男性")
     }
 
     func testJapaneseWordTokenizerPreservesTextAndMarksWords() {

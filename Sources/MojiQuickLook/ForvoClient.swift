@@ -285,7 +285,13 @@ enum ForvoPageParser {
         let speaker = firstCapture(
             #"Pronunciation\s+by(?:\s|&nbsp;)*<span[^>]*data-p2=['\"]([^'\"]+)['\"]"#,
             in: block
-        ).map(decodeHTMLEntities)
+        ).map(decodeHTMLEntities) ?? firstCapture(
+            #"Pronunciation\s+by(?:\s|&nbsp;)*<span[^>]*>(.*?)</span>"#,
+            in: block
+        ).map {
+            decodeHTMLEntities(strippingTags(from: $0))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         let profile = firstCapture(
             #"class=['\"]responsive-gender-country['\"][^>]*>(.*?)</span>"#,
             in: block
